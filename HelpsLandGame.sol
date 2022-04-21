@@ -81,7 +81,7 @@ contract HelpsLandGame is HelpsLand, HelpsFarm, HelpsRef {
     if(farms[_msgSender()].status == false){
       farms[_msgSender()].endTime = whiteLists[_msgSender].freeTime;
       farms[_msgSender()].nextWateringTime = block.timestamp;
-      farms[_msgSender()].statusb= true;
+      farms[_msgSender()].status = true;
      }
   }
 
