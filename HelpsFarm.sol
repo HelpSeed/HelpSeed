@@ -1,114 +1,133 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^ 0.8.2;
 
-import "./HelpsFarmCalculate.sol";
-import "./HelpsGame.sol";
+import "./HelpsLand.sol";
 
-abstract contract HelpsFarm is  HelpsGame, HelpsFarmCalculate{
-  using SafeMath for uint256;
 
-uint256 private unlockFarmPrice;
-  
+/**
+* @dev This Contract was written for the Farm System of the HelpsLand Game. 
+* The methods in this contract cover the Farm System.
+**/
+
+  contract HelpsFarm is HelpsLand {
+
+
+address private _poolAddress; // Earn Pool;
+
+
+constructor(){
+ _poolAddress = address(this); // this Contract is Pool;
+}
+ 
    struct Farm {
-    uint256 totalMint;
-    uint256 nextWateringTime;
-    uint256 endTime;
-    bool status;
+    uint256 totalMint; // Farm Total Earn
+    uint256 nextWateringTime; // Farm Next Watering Time 
+    uint256 endTime; // Farm End Time
+    bool status; // Farm Status 
   }
 
   mapping(address => Farm) private farms;
-  address private poolAddress; 
-  
- event NewUnlockFarmPrice(uint256 price);
+
  event UnlockFarm(address indexed user);
  event LockFarm(address indexed user);
 
 
-  function setUnlockFarmPrice(uint256 u) public onlyOwner {
-    require(u > 0, "Don't Set Zero");
-    unlockFarmPrice = u * 10 ** 18;
-    emit NewUnlockFarmPrice(unlockFarmPrice);
-  }
-
-   function setPoolAddress(address p) public onlyOwner {
-    poolAddress = p;
-  }
-
-  function getUnlockFarmPrice() public view returns(uint256){
-  return unlockFarmPrice;
-  }
-
- function getPoolBalance() public view returns(uint256){
-  return helps.balanceOf(address(poolAddress)); // Pool Live Balance
-  }
-
-  function getPoolAddress()  public view returns(address){
-    return poolAddress;
-  }
-
-  function _farm(address user) internal view returns(Farm memory){
-  return farms[user];
-  }
- 
-  function safeFarmMethodTwo(address from, uint256 activatedSaleCounts, uint256 balance) internal view returns(bool) {
-    if (farms[from].status == true) {
-      return activatedSaleCounts+1 == balance ? false : true;
-    } else{
-     return activatedSaleCounts == balance ? false : true;
+  /**
+  * @dev Returns Number of Tokens in the Pool
+  **/
+  function getPoolBalanceToken() public view returns(uint256){
+    return IERC20(IHGT.defaultToken()).balanceOf(address(_poolAddress));
     }
-  }
- 
 
+
+  /**
+  * @dev Returns Address the Pool
+  **/
+  function getPoolAddress()  public view returns(address){
+    return _poolAddress;
+  }
+
+  /**
+  * @dev User Set Lock Farm
+  **/
   function _lockFarm(address user) private {
     farms[user].status = false;
    }
 
-  function expireDetect(address user) internal {
-    if (farms[user].endTime <= block.timestamp) {
-      _lockFarm(user);
-      emit LockFarm(user);
+
+  /**
+  * @dev User Farm Expiry Detection
+  **/
+  function expireDetect(uint256 endTime) internal {
+    if (endTime <= block.timestamp) {
+      _lockFarm(_msgSender());
+      emit LockFarm(_msgSender());
     }
   }
 
-  function checkFarmExpireTime(address user) internal {
-    require(farms[user].endTime <= block.timestamp, "Until time");
-    _unlockFarm(user);
-    emit UnlockFarm(user);
-  }
 
-    function _calculateUnlockFarmPrice(uint256 landsCount) internal view returns(uint256) {
-    uint256 u = landsCount == 0 ? 1 : landsCount * unlockFarmPrice;
-    return u;
-  }
-
-   function _unlockFarm(address user) internal {
+  /**
+  * @dev User Set Unlock Farm
+  **/
+   function unlock(address user) private {
      farms[user].status = true;
      farms[user].nextWateringTime = block.timestamp;
      farms[user].endTime = block.timestamp + 30 days;
    }
+   
 
+  /**
+  * @dev User Farm End Time Control
+  **/
+  function checkFarmExpireTime(address user) internal {
+    require(farms[user].endTime <= block.timestamp, "Until time");
+    // If the Farm Duration Time has passed, it will be unlocked again.
+    unlock(user);
+    emit UnlockFarm(user);
+  }
+
+  /**
+  * @dev User Returns Farm Data
+  **/
   function getFarm(address user) public view returns(Farm memory) {
    require(user != address(0));
     return farms[user];
   }
 
-
-function _wateringSeeds(uint256 balance, uint256 landPrice ) internal returns(uint256) {
-    require(farms[_msgSender()].status == true, "Farm Mode Disable");
-    require(farms[_msgSender()].nextWateringTime < block.timestamp, "Until Time");
-    expireDetect(_msgSender());
-    uint256 earnAmount = calculateDailyEarn(balance, landPrice, getPoolBalance());
-    farms[_msgSender()].nextWateringTime = block.timestamp + 1 days;
-    farms[_msgSender()].totalMint += earnAmount;
+  /**
+  * @dev User Unlock Farm Action.
+  **/
+  function _unlockFarm() public nonReentrant{
+    require(_msgSender() != address(0));
+  require(balanceOf(_msgSender()) > 0, "You Don't Have Land.");   
+  address _fToken = IHGT.defaultToken();
+   uint256 _unlockFarmPriceToken =  calculateUnlockFarmPrice(balanceOf(_msgSender()), IHGT.unlockFarmPriceToken(_fToken));
+  require(IHGT.UFT(_fToken).balanceOf(_msgSender()) >= _unlockFarmPriceToken, "Insufficient balance.");
+  checkFarmExpireTime(_msgSender());
+  IHGT.UFT(_fToken).transferFrom(_msgSender(), owner(), _unlockFarmPriceToken);
+  }
+  
+  /**
+  * @dev User Watering Seeds Action.
+  **/
+   function wateringSeeds(address fToken) internal returns(uint256) {
+     require(_msgSender() != address(0));
+     uint256 landsCount = balanceOf(_msgSender());
+    require(landsCount > 0, "You Don't Have Land.");   
+    Farm memory farm = farms[_msgSender()];
+    require(farm.status == true, "Farm Mode Disable");
+    expireDetect(farm.endTime);
+    require(farm.nextWateringTime < block.timestamp, "Until Time");
+    uint256 earnAmount = calculateDailyEarn(landsCount, IHGT.landPriceToken(fToken), getPoolBalanceToken());
+    require(earnAmount > 0, "Failed Earn Amount");
+    farm.nextWateringTime = block.timestamp + 1 days;
+    farm.totalMint += earnAmount;
+    farms[_msgSender()] = farm;
     return earnAmount;
+
 }
 
-    function rescueBNBFromContract() external onlyOwner {
-        address payable _owner = payable(msg.sender);
-        _owner.transfer(address(this).balance);
-    }
+ 
 
-    function burnPool(uint _amount) public onlyOwner {
-      helps.transfer(address(0x000000000000000000000000000000000000dEaD), _amount);
-    }
-}
+
+  }
