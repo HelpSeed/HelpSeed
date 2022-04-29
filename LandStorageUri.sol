@@ -139,7 +139,7 @@ abstract contract HelpSeedLandStorage is ERC721 {
     // Optional mapping for token URIs
 
     struct ULand {
-     bytes2 flag;
+     bytes2 country;
      bytes15 hexId;
     }
 
@@ -150,7 +150,7 @@ abstract contract HelpSeedLandStorage is ERC721 {
 
       function get(uint256 tokenId) internal view returns (string memory) {
        string memory svg = string(abi.encodePacked("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' style='enable-background:new 0 0 512 512' width='350' height='350' xml:space='preserve'><path style='fill:#173b57' d='M80 0h352c44.184 0 80 35.816 80 80v352c0 44.184-35.816 80-80 80H80c-44.184 0-80-35.816-80-80V80C0 35.816 35.816 0 80 0z'/><path style='fill:#c37a86' d='m112.2 173.408 143.8-82.6 143.8 82.6v165.184l-143.8 82.6-143.8-82.6z'/><text font-family='Helvetica, sans-serif' style='font-size:20px;text-transform: uppercase;font-weight:800;fill:#ffff' x='25%' y='265'>",abi.encodePacked(_landTokenUris[tokenId].hexId),"~",abi.encodePacked(_landTokenUris[tokenId].country),"</text><g/><g/><g/><g/><g/><g/><g/><g/><g/><g/><g/><g/><g/><g/><g/><text font-family='Helvetica, sans-serif' x='18%' y='480' style='font-size:25px;font-weight:800;fill:white'>METAVERSE HELPSLAND</text></svg>"));
-       string memory json=Base64.encode(bytes(string(abi.encodePacked('{"name": "HelpSeed Metaverse Land ', _landTokenUris[tokenId].hexId, '",','"description":"HelpSeed Metaverse Land Game Nft Item",','"image": "',svg, '",','"attributes":[{"trait_type":"Hex Id", "value":"', abi.encodePacked(_landTokenUris[tokenId].hexId), '"}'',{"trait_type":"Flag", "value":"', abi.encodePacked(_landTokenUris[tokenId].flag), '"}',']}'))));
+       string memory json=Base64.encode(bytes(string(abi.encodePacked('{"name": "HelpSeed Metaverse Land ', _landTokenUris[tokenId].hexId, '",','"description":"HelpSeed Metaverse Land Game Nft Item",','"image": "',svg, '",','"attributes":[{"trait_type":"Hex Id", "value":"', abi.encodePacked(_landTokenUris[tokenId].hexId), '"}'',{"trait_type":"Flag", "value":"', abi.encodePacked(_landTokenUris[tokenId].country), '"}',']}'))));
         return string(abi.encodePacked('data:application/json;base64,', json));
     } 
     /**
@@ -162,11 +162,18 @@ abstract contract HelpSeedLandStorage is ERC721 {
           
               }
 
-    function _setTokenURI(uint256 tokenId, bytes15 hexId, bytes2 flag) internal virtual {
+    /**
+     * @dev Sets `_tokenURI` as the tokenURI of `tokenId`.
+     *
+     * Requirements:
+     *
+     * - `tokenId` must exist.
+     */
+    function _setTokenURI(uint256 tokenId, bytes15 hexId, bytes2 country) internal virtual {
         require(_exists(tokenId), "LANDSTORAGEURI: URI set of nonexistent token");
        ULand memory uland = _landTokenUris[tokenId];
        uland.hexId = hexId;
-       uland.flag = flag;
+       uland.country = country;
        _landTokenUris[tokenId] = uland;
     }
 
